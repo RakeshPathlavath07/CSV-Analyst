@@ -3,7 +3,7 @@
 # --- LLM and Agent Settings ---
 LLM_MODEL = "openai/gpt-oss-20b"
 MAX_TOKENS = 2048
-TEMPERATURE = 0.1
+TEMPERATURE = 0.7
 
 # --- System Prompts ---
 
