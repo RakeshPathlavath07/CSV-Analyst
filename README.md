@@ -11,13 +11,6 @@ This project is a sophisticated, full-stack web application that deploys a **con
 
 ---
 
-### ✨ Live Demo & Screenshot
-
-*(**Suggestion:** Create a short GIF of the app in action and replace the placeholder below. This is the most effective way to showcase your project. You can use tools like LICEcap, Kap, or ScreenToGif.)*
-
-![Project Demo GIF](placeholder_for_your_demo.gif)
-
----
 
 ### 🚀 The Problem & Our Solution
 
