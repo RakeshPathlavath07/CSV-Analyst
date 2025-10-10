@@ -2,17 +2,18 @@
 import streamlit as st
 import pandas as pd
 from ydata_profiling import ProfileReport
-import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 def initial_setup():
-    st.set_page_config(page_title="Smart Router AI Agent", layout="wide")
+    st.set_page_config(page_title="Advanced AI Visualizer", layout="wide")
     for key in ["agent", "data_manager", "chat_history", "df_states", "current_df_index", "user_choice", "active_chart", "profiled", "file_id", "queued_prompt"]:
         if key not in st.session_state:
             st.session_state[key] = None if key not in ["chat_history", "df_states"] else []
             if key == "current_df_index": st.session_state[key] = -1
 
 def display_chat_history():
-    """Displays all messages, and now renders charts from history."""
+    """Displays all messages, and renders charts from history."""
     for i, message in enumerate(st.session_state.chat_history):
         with st.chat_message(message["role"]):
             if message.get("content"): st.markdown(message["content"])
@@ -52,37 +53,66 @@ def file_uploader_and_profiling(data_manager):
                     st.sidebar.error(f"❌ Error loading file: {error}")
     return uploaded_file is not None
 
-# --- CRITICAL FIX: The plotting function is now much more robust ---
+# --- CRITICAL FIX: The plotting logic is now corrected ---
 def render_plotly_chart(chart_params, df):
     """
-    Renders a Plotly chart by inferring axes from the dataframe, not the router's guess.
+    Renders complex, multi-series, and combination Plotly charts with corrected logic.
     """
     st.markdown("---")
-    chart_type = chart_params.get("chart_type", "bar") # Default to bar chart if type is missing
-
-    # Heuristic: For a 2-column dataframe, the first is X and the second is Y.
-    # This is more reliable than trusting the LLM's parameter extraction for column names.
-    if df.shape[1] < 2:
-        st.error(f"❌ Chart generation failed: The retrieved data has {df.shape[1]} column(s), but 2 are required for a chart.")
-        st.dataframe(df)
-        return
-
-    # Infer column names directly from the data that was successfully queried.
-    x = df.columns[0]
-    y = df.columns[1]
     
-    title = f"{y.replace('_', ' ').title()} by {x.replace('_', ' ').title()}"
+    primary_chart_type = chart_params.get("chart_type", "bar")
+    x = chart_params.get("x_axis")
+    y_axes = chart_params.get("y_axis", [])
+    
+    if not isinstance(y_axes, list): y_axes = [y_axes]
 
-    try:
-        st.subheader(title)
-        if chart_type == "bar": fig = px.bar(df, x=x, y=y, title=title)
-        elif chart_type == "pie": fig = px.pie(df, names=x, values=y, title=title)
-        elif chart_type == "line": fig = px.line(df, x=x, y=y, title=title)
-        elif chart_type == "scatter": fig = px.scatter(df, x=x, y=y, title=title)
-        else:
-            st.warning(f"⚠️ Chart type '{chart_type}' not supported. Defaulting to bar chart.")
-            fig = px.bar(df, x=x, y=y, title=title)
+    # --- Safety Checks ---
+    if not all([x, y_axes]): st.error("❌ Chart failed: Missing x_axis or y_axis parameters."); return
+    all_cols = [x] + y_axes
+    if "secondary_y_axis" in chart_params: all_cols.append(chart_params["secondary_y_axis"])
+    for col in all_cols:
+        if col not in df.columns:
+            st.error(f"❌ Chart failed: Column '{col}' not found. Available: {list(df.columns)}"); return
+
+    # --- Figure Initialization ---
+    has_secondary_axis = "secondary_y_axis" in chart_params
+    if has_secondary_axis:
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+    else:
+        fig = go.Figure()
+
+    # --- Plot Primary Y-Axes ---
+    # This loop no longer uses the 'secondary_y' argument, fixing the bug.
+    for y_col in y_axes:
+        if primary_chart_type == "bar":
+            fig.add_trace(go.Bar(x=df[x], y=df[y_col], name=y_col))
+        elif primary_chart_type == "line":
+            fig.add_trace(go.Scatter(x=df[x], y=df[y_col], mode='lines+markers', name=y_col))
+        elif primary_chart_type == "scatter":
+            fig.add_trace(go.Scatter(x=df[x], y=df[y_col], mode='markers', name=y_col))
+
+    # --- Plot Secondary Y-Axis (if applicable) ---
+    # This is the ONLY place where secondary_y=True is used, which is correct.
+    if has_secondary_axis:
+        sec_y = chart_params["secondary_y_axis"]
+        sec_type = chart_params.get("secondary_chart_type", "line")
         
-        st.plotly_chart(fig, use_container_width=True)
-    except Exception as e:
-        st.error(f"❌ Failed to create chart '{title}': {e}")
+        if sec_type == "line":
+            fig.add_trace(go.Scatter(x=df[x], y=df[sec_y], name=f"{sec_y} (right axis)", mode='lines'), secondary_y=True)
+        elif sec_type == "bar":
+            fig.add_trace(go.Bar(x=df[x], y=df[sec_y], name=f"{sec_y} (right axis)"), secondary_y=True)
+        
+        fig.update_yaxes(title_text=sec_y.replace("_", " ").title(), secondary_y=True)
+
+    # --- Final Touches and Rendering ---
+        # --- Final Touches and Rendering ---
+    title = f"{', '.join(y_axes).title()} vs. {x.title()}"
+    fig.update_layout(title_text=title, legend_title_text="Metrics")
+    fig.update_xaxes(title_text=x.replace("_", " ").title())
+    if has_secondary_axis:
+        fig.update_yaxes(title_text=", ".join(y_axes).replace("_", " ").title(), secondary_y=False)
+    else:
+        fig.update_yaxes(title_text=", ".join(y_axes).replace("_", " ").title())
+
+    st.subheader(title)
+    st.plotly_chart(fig, use_container_width=True)
