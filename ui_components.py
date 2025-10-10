@@ -2,7 +2,6 @@
 import streamlit as st
 import pandas as pd
 from ydata_profiling import ProfileReport
-# REMOVED: from streamlit_pandas_profiling import st_profile_report
 import plotly.express as px
 
 def initial_setup():
@@ -47,28 +46,32 @@ def file_uploader_and_profiling(data_manager):
                     st.sidebar.success("✅ File loaded successfully!")
                     with st.expander("📊 View Data Profile Report"):
                         pr = ProfileReport(data_manager.get_current_df(), title="Data Profile")
-                        # --- CRITICAL FIX: Use the modern way to display the report ---
                         st.components.v1.html(pr.to_html(), height=600, scrolling=True)
                     st.session_state.profiled = True
                 else:
                     st.sidebar.error(f"❌ Error loading file: {error}")
     return uploaded_file is not None
 
+# --- CRITICAL FIX: The plotting function is now much more robust ---
 def render_plotly_chart(chart_params, df):
-    """Renders a Plotly chart based on the parameters from the smart router."""
+    """
+    Renders a Plotly chart by inferring axes from the dataframe, not the router's guess.
+    """
     st.markdown("---")
-    chart_type = chart_params.get("chart_type")
-    x = chart_params.get("x_axis")
-    y = chart_params.get("y_axis")
-    title = f"{y} by {x}".title()
+    chart_type = chart_params.get("chart_type", "bar") # Default to bar chart if type is missing
 
-    if not all([chart_type, x, y]):
-        st.error(f"❌ Chart generation failed: Missing parameters. Received: {chart_params}")
+    # Heuristic: For a 2-column dataframe, the first is X and the second is Y.
+    # This is more reliable than trusting the LLM's parameter extraction for column names.
+    if df.shape[1] < 2:
+        st.error(f"❌ Chart generation failed: The retrieved data has {df.shape[1]} column(s), but 2 are required for a chart.")
+        st.dataframe(df)
         return
+
+    # Infer column names directly from the data that was successfully queried.
+    x = df.columns[0]
+    y = df.columns[1]
     
-    if x not in df.columns or y not in df.columns:
-        st.error(f"❌ Chart generation failed: Columns '{x}' or '{y}' not found. Available: {list(df.columns)}")
-        return
+    title = f"{y.replace('_', ' ').title()} by {x.replace('_', ' ').title()}"
 
     try:
         st.subheader(title)
@@ -79,6 +82,7 @@ def render_plotly_chart(chart_params, df):
         else:
             st.warning(f"⚠️ Chart type '{chart_type}' not supported. Defaulting to bar chart.")
             fig = px.bar(df, x=x, y=y, title=title)
+        
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"❌ Failed to create chart '{title}': {e}")
