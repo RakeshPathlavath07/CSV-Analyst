@@ -3,49 +3,46 @@
 # --- LLM and Agent Settings ---
 LLM_MODEL = "openai/gpt-oss-20b"
 MAX_TOKENS = 2048
-TEMPERATURE = 0.7
+TEMPERATURE = 1
 
 # --- System Prompts ---
 
 ROUTER_PROMPT = """
-You are a highly intelligent task routing agent. Your job is to analyze a user's prompt and decompose it into a specific tool to use and the parameters for that tool. You must respond in a strict JSON format.
+You are a highly intelligent task routing agent. Your job is to analyze a user's prompt and decompose it into a specific tool and its parameters. You must respond in a strict JSON format.
 
 **Available Tools:**
 
-1.  **`run_sql_query`**:
-    - Use this when the user asks a question that requires fetching, calculating, or manipulating data from the database.
-    - This is for questions like "what is the average price?", "show the top 5 products", "how many rows are there?".
-    - The `parameters` for this tool should be a single string containing the user's question.
+1.  **`run_sql_query`**: Use for questions that require fetching or calculating data.
     - Example: `{{"tool": "run_sql_query", "parameters": {{"prompt": "what are the total sales by region?"}}}}`
 
-2.  **`create_visualization`**:
-    - Use this ONLY when the user explicitly asks to "plot", "chart", "graph", "draw", or "visualize" something.
-    - You must extract the `chart_type`, the column for the `x_axis`, and the column(s) for the `y_axis`.
-    - If an aggregation is mentioned (like "total sales"), include it in the y_axis.
-    - Example: `{{"tool": "create_visualization", "parameters": {{"chart_type": "bar", "x_axis": "region", "y_axis": "total sales"}}}}`
+2.  **`create_visualization`**: Use ONLY when the user asks to "plot", "chart", "graph", or "visualize".
+    - `chart_type`: The primary chart type (e.g., 'bar', 'line', 'scatter').
+    - `x_axis`: The column for the X-axis.
+    - `y_axis`: **A LIST of columns/calculations for the Y-axis.**
+    - `secondary_chart_type` (optional): The type for a second Y-axis (e.g., 'line').
+    - `secondary_y_axis` (optional): The column for the second Y-axis.
 
-3.  **`general_greeting`**:
-    - Use for conversational filler like "hello", "thanks", "ok".
-    - Example: `{{"tool": "general_greeting", "parameters": {{}}}}`
+**EXAMPLES:**
+- "plot sales and profit by region" -> `{{"tool": "create_visualization", "parameters": {{"chart_type": "bar", "x_axis": "region", "y_axis": ["sales", "profit"]}}}}`
+- "show sales as bars and profit margin as a line against year" -> `{{"tool": "create_visualization", "parameters": {{"chart_type": "bar", "x_axis": "year", "y_axis": ["sales"], "secondary_chart_type": "line", "secondary_y_axis": "profit margin"}}}}`
 
 **User Prompt:** "{user_prompt}"
 **Table Schema:** {schema}
 
-Analyze the user's prompt and the schema, then respond with ONLY the JSON object for the chosen tool and its parameters.
+Analyze the user's prompt and the schema, then respond with ONLY the JSON object.
 """
 
-# This is now used INTERNALLY by the visualization tool
+# This prompt now knows how to fetch multiple Y-axis columns
 DATA_FETCH_PROMPT_FOR_VIZ = """
-You are a simple SQL generator. Your only job is to write a query to fetch the raw data needed for a chart.
-- The user wants a {chart_type} chart.
-- The X-axis is: `{x_axis}`.
-- The Y-axis is: `{y_axis}`.
+You are a simple SQL generator. Your job is to write a query to fetch the raw data needed for a chart.
+- The user wants a chart with X-axis: `{x_axis}` and Y-axis/axes: `{y_axis_str}`.
 - The table is `{table_name}` with schema: `{schema}`.
 
-Generate a simple DuckDB SQL query to select the necessary columns. If the Y-axis requires an aggregation (like SUM, AVG, COUNT), apply it and GROUP BY the X-axis column.
+Generate a simple DuckDB SQL query to select the necessary columns.
+If any Y-axis requires an aggregation (like SUM, AVG, COUNT), apply it and GROUP BY the X-axis column.
+For example, if Y-axis is "total sales, average profit", your query should select `SUM(sales), AVG(profit)`.
 Output ONLY the SQL query.
 """
-
 SQL_GENERATOR_PROMPT = """
 You are a DuckDB SQL expert. Your goal is to generate one valid and executable SQL query.
 
