@@ -50,9 +50,7 @@ class DataManager:
         """Executes a SQL query and returns the result as a DataFrame."""
         try:
             result_df = self.conn.execute(query).df()
-            # If the query modifies data (e.g., a hypothetical UPDATE), we would update state here.
-            # For now, we assume most queries are SELECT.
-            # A more advanced version would parse the query to check for DML statements.
+            
             return result_df, None
         except Exception as e:
             return None, str(e)
