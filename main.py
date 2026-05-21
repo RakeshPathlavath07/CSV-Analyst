@@ -38,7 +38,7 @@ def generate_and_run_query(agent: Agent, data_manager: DataManager, user_prompt:
 
 def main():
     initial_setup()
-    st.title("💡 Robust AI Data Agent")
+    st.title("CSV Data Analysis")
     st.write("Now with a resilient, recursive error-fixing loop and reliable context.")
 
     # --- Setup ---
