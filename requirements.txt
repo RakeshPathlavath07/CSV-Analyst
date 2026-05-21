@@ -24,4 +24,4 @@ torch==2.1.2
 torchvision==0.16.2
 sentence-transformers==2.7.0
 rapidfuzz==3.6.1
-setuptools
+setuptools==70.0.0
