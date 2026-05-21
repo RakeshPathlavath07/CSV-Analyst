@@ -53,7 +53,7 @@ def file_uploader_and_profiling(data_manager):
                     st.sidebar.error(f"❌ Error loading file: {error}")
     return uploaded_file is not None
 
-# --- CRITICAL FIX: The plotting logic is now corrected ---
+
 def render_plotly_chart(chart_params, df):
     """
     Renders complex, multi-series, and combination Plotly charts with corrected logic.
@@ -74,7 +74,7 @@ def render_plotly_chart(chart_params, df):
         if col not in df.columns:
             st.error(f"❌ Chart failed: Column '{col}' not found. Available: {list(df.columns)}"); return
 
-    # --- Figure Initialization ---
+    
     has_secondary_axis = "secondary_y_axis" in chart_params
     if has_secondary_axis:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
